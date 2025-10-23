@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login Administrador - BookingPlane</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+
+<body class="bg-gray-50 flex items-center justify-center min-h-screen">
+
+  <main class="flex flex-col lg:flex-row bg-white shadow-xl rounded-2xl overflow-hidden w-full max-w-5xl">
+
+    <!-- Sección Login -->
+    <section class="lg:w-1/2 p-8 flex flex-col justify-center">
+      <form id="formulario_login" onsubmit="event.preventDefault(); validar()" class="space-y-6">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">Iniciar sesión</h1>
+
+        <div class="flex flex-col">
+          <label class="text-gray-700 mb-1">Usuario</label>
+          <input id="correo" type="text" required placeholder="Digite su correo"
+            class="border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div class="flex flex-col">
+          <label class="text-gray-700 mb-1">Contraseña</label>
+          <input id="contra" type="password" required placeholder="Digite su contraseña"
+            class="border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <button type="submit"
+          class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 rounded-xl transition">
+          Ingresar
+        </button>
+      </form>
+    </section>
+
+    <!-- Sección Descripción -->
+    <section class="hidden lg:flex lg:w-1/2 bg-indigo-600 text-white flex-col justify-center p-8">
+      <h1 class="text-4xl font-bold mb-4">Bienvenido Administrador</h1>
+      <h3 class="text-xl mb-4">Gestión de BookingPlane</h3>
+      <p class="text-gray-200">
+        Administra vuelos, reservas y pasajeros de manera rápida y segura. 
+        BookingPlane te permite controlar la disponibilidad de asientos, verificar reservas y gestionar todo desde un solo panel.
+      </p>
+    </section>
+
+  </main>
+
+  <script>
+    async function validar() {
+      const correo = document.getElementById("correo").value;
+      const contra = document.getElementById("contra").value;
+
+      try {
+        const res = await fetch("http://127.0.0.1:5000/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ correo, password: contra })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          Swal.fire({
+            icon: 'success',
+            title: '¡Bienvenido!',
+            text: data.message,
+            confirmButtonText: 'Continuar'
+          }).then(() => {
+              window.location.href="dashboard.html"
+          });
+        } else {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: data.error
+          });
+        }
+      } catch (err) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'No se pudo conectar al servidor.'
+        });
+        console.error(err);
+      }
+    }
+  </script>
+
+</body>
+</html>

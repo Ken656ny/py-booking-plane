@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seleccionar Asientos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    :root {
+      --seat: #e5e7eb;
+      --seat-occupied: #ef4444;
+      --seat-selected: #22c55e;
+      --seat-blocked: #9ca3af;
+    }
+    body {
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+    }
+    .seat {
+      inline-size: 36px; block-size: 36px;
+      border-radius: .5rem;
+      display: grid; place-items: center;
+      cursor: pointer;
+      border: 2px solid #11182720;
+      background: var(--seat);
+      transition: transform .08s ease, box-shadow .08s ease;
+    }
+    .seat[data-state="RESERVADO"] {
+      background: var(--seat-occupied); color: white; cursor: not-allowed;
+    }
+    .seat[data-state="SELECCIONADO"] {
+      background: var(--seat-selected); color: white;
+    }
+    .seat[data-state="BLOQUEADO"] {
+      background: var(--seat-blocked); color: white; cursor: not-allowed;
+    }
+    .seat:active { transform: scale(.95); }
+  </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+  <main class="mx-auto max-w-6xl px-6 py-10 flex gap-8">
+    <!-- 🔹 Zona izquierda: mapa de avión -->
+    <div class="flex-1 relative rounded-2xl overflow-hidden shadow-lg bg-white">
+      <div class="absolute inset-0 bg-cover bg-center opacity-20"
+           style="background-image: url('https://i.imgur.com/4ZxV6Qx.jpg');"></div>
+
+      <div class="relative p-4">
+        <!-- Letras arriba -->
+        <div class="grid grid-cols-7 mb-2 text-center text-sm font-bold text-gray-700">
+            <div></div>
+          <div>A</div><div>B</div><div>C</div><div>D</div><div>E</div><div>F</div>
+        </div>
+
+        <!-- Contenedor de filas -->
+        <div id="asientosContainer" class="space-y-2"></div>
+      </div>
+    </div>
+
+    <div class="w-80 bg-white rounded-2xl p-6 shadow-md space-y-4">
+      <h2 class="text-xl font-semibold">Tu selección</h2>
+      <p id="counter" class="text-gray-600 text-sm">máximo <b>5</b> personas</p>
+
+      <div class="border rounded-lg p-3 bg-gray-50">
+        <h3 class="font-medium text-gray-700 mb-2">Asientos seleccionados:</h3>
+        <ul id="listaSeleccionados" class="text-sm text-gray-800 space-y-1"></ul>
+      </div>
+
+      <button id="confirm"
+              class="w-full rounded-xl bg-indigo-600 text-white py-2 hover:bg-indigo-700 transition">
+        Confirmar selección
+      </button>
+    </div>
+  </main>
+
+  <script>
+    const MAX = 5;
+    const vueloId = localStorage.getItem("id_vuelo");
+    let seats = [];
+    let seleccionados = [];
+
+    // 🔹 Cargar los asientos del vuelo
+    async function cargarAsientos() {
+      const res = await fetch(`http://127.0.0.1:5000/vuelo/${vueloId}/asientos`);
+      const data = await res.json();
+      seats = data.asientos;
+
+      const contenedor = document.getElementById("asientosContainer");
+      contenedor.innerHTML = "";
+
+      // Agrupar por filas (número)
+      const filas = {};
+      seats.forEach(a => {
+        const filaNum = a.nombre_asiento.match(/\d+/)[0];
+        if (!filas[filaNum]) filas[filaNum] = [];
+        filas[filaNum].push(a);
+      });
+
+      // Crear cada fila visualmente
+      Object.keys(filas).forEach(num => {
+        const filaDiv = document.createElement("div");
+        filaDiv.className = "grid grid-cols-7 gap-2 items-center";
+
+        const label = document.createElement("div");
+        label.textContent = num;
+        label.className = "text-sm font-medium text-gray-600 text-center";
+        filaDiv.appendChild(label);
+
+        filas[num].forEach(a => {
+          const btn = document.createElement("button");
+          btn.className = "seat";
+          btn.dataset.state = a.estado;
+          if (a.estado === "RESERVADO") btn.textContent = "✖";
+
+          btn.addEventListener("click", () => seleccionarAsiento(btn, a));
+          filaDiv.appendChild(btn);
+        });
+
+        contenedor.appendChild(filaDiv);
+      });
+
+      actualizarContador();
+    }
+
+    // 🔹 Selección lógica
+    function seleccionarAsiento(btn, asiento) {
+      if (asiento.estado === "RESERVADO" || asiento.estado === "BLOQUEADO") return;
+
+      if (btn.dataset.state === "SELECCIONADO") {
+        btn.dataset.state = "DISPONIBLE";
+        btn.textContent = "";
+        seleccionados = seleccionados.filter(s => s !== asiento.nombre_asiento);
+      } else {
+        if (seleccionados.length >= MAX) {
+          Swal.fire({
+            icon: 'warning',
+            title: 'Máximo alcanzado',
+            text: `Solo puedes seleccionar hasta ${MAX} asientos`
+          });
+          return;
+        }
+        btn.dataset.state = "SELECCIONADO";
+        btn.textContent = "👤";
+        seleccionados.push(asiento.nombre_asiento);
+      }
+
+      actualizarContador();
+    }
+
+    // 🔹 Actualiza contador y lista lateral
+    function actualizarContador() {
+      document.getElementById("counter").innerHTML =
+        `máximo <b>${MAX}</b> personas — seleccionados: <b>${seleccionados.length}</b>`;
+      const lista = document.getElementById("listaSeleccionados");
+      lista.innerHTML = seleccionados.map(s => `<li>${s}</li>`).join("");
+    }
+
+    // 🔹 Confirmar selección
+    document.getElementById("confirm").addEventListener("click", () => {
+      if (seleccionados.length === 0) {
+        Swal.fire({
+          icon: 'info',
+          title: 'Atención',
+          text: 'Selecciona al menos un asiento'
+        });
+        return;
+      }
+
+      // Guardar en localStorage
+      localStorage.setItem("asientosSeleccionados", JSON.stringify(seleccionados));
+      localStorage.setItem("cantidadPasajeros", seleccionados.length);
+      localStorage.setItem("id_vuelo", vueloId);
+
+      Swal.fire({
+        icon: 'success',
+        title: '¡Asientos seleccionados!',
+        html: `Se seleccionaron <b>${seleccionados.length}</b> asiento(s):<br>${seleccionados.join(", ")}`,
+        confirmButtonText: 'Continuar'
+      }).then(() => {
+        // Redirigir al formulario
+        window.location.href = "formulario.html";
+      });
+    });
+
+    window.onload = cargarAsientos;
+  </script>
+</body>
+</html>
